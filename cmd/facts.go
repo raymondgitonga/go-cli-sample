@@ -1,7 +1,3 @@
-/*
-Copyright © 2022 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
@@ -9,7 +5,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -20,17 +19,41 @@ var factsCmd = &cobra.Command{
 	Short: "Get a random Chuck Norris fact",
 	Long:  "This command fetches Chuck Norris facts from the chucknorris.io api",
 	Run: func(cmd *cobra.Command, args []string) {
-		getChuckNorrisFact()
+		category, err := cmd.Flags().GetString("cat")
+
+		if err != nil {
+			fmt.Printf("Error reading cat flag: %v", err)
+		}
+
+		if category != "" {
+			exist := checkValidCategory(category)
+
+			if exist {
+				getChuckNorrisFactWithCategory(category)
+			} else {
+				fmt.Printf("Category %s does not exist", category)
+			}
+
+		} else {
+			getChuckNorrisFact()
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(factsCmd)
+
+	rootCmd.PersistentFlags().String("cat", "", "Search category for Chuck Norris Fact")
 }
 
 type RandomFact struct {
 	ID    string `json:"id"`
 	Value string `json:"value"`
+}
+
+type RandomFacts struct {
+	Total  int          `json:"total"`
+	Result []RandomFact `json:"result"`
 }
 
 func getChuckNorrisFact() {
@@ -45,6 +68,31 @@ func getChuckNorrisFact() {
 	}
 
 	fmt.Println(randomFact.Value)
+}
+
+func getChuckNorrisFactWithCategory(category string) {
+	url := fmt.Sprintf("https://api.chucknorris.io/jokes/search?query=%s", category)
+
+	respBody := makeChuckNorrisCall(url)
+	randomFacts := RandomFacts{}
+	err := json.Unmarshal(respBody, &randomFacts)
+
+	if err != nil {
+		log.Printf("Error unmarshalling %v", err)
+	}
+
+	fact := randomiseFact(randomFacts)
+
+	fmt.Println(fact.Value)
+}
+
+func randomiseFact(randomFacts RandomFacts) RandomFact {
+	rand.Seed(time.Now().UnixNano())
+	min := 0
+	max := randomFacts.Total
+	randomIndex := rand.Intn(max-min+1) + min
+	return randomFacts.Result[randomIndex]
+
 }
 
 func makeChuckNorrisCall(url string) []byte {
@@ -67,3 +115,17 @@ func makeChuckNorrisCall(url string) []byte {
 
 	return body
 }
+
+func checkValidCategory(category string) bool {
+	categoriesList := []string{"fashion", "animal", "history"}
+
+	for _, c := range categoriesList {
+		if strings.ToLower(category) == c {
+			return true
+		}
+	}
+
+	return false
+}
+
+// fashion, animal, history
