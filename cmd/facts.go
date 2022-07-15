@@ -127,5 +127,3 @@ func checkValidCategory(category string) bool {
 
 	return false
 }
-
-// fashion, animal, history
